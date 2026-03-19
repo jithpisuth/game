@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snakes & Ladders Ultimate Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF4757;
+            --secondary: #2ED573;
+            --accent: #1E90FF;
+            --bg: #F1F2F6;
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .setup-screen {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            z-index: 100;
+        }
+
+        .game-container {
+            display: none;
+            flex-direction: row;
+            gap: 30px;
+            align-items: flex-start;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        canvas {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+            border: 8px solid white;
+        }
+
+        .side-panel {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 20px;
+            width: 250px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        .player-card {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 10px;
+            background: #eee;
+            transition: 0.3s;
+        }
+
+        .player-card.active {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255,71,87,0.4);
+        }
+
+        .dice-area {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #dice-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 5px 0 #b33939;
+            transition: 0.1s;
+        }
+
+        #dice-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b33939; }
+
+        .title { color: #2f3542; text-shadow: 2px 2px 0 white; font-size: 2.5rem; margin-bottom: 20px; }
+        
+        button.setup-btn {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 10px;
+            border: 2px solid var(--accent);
+            background: white;
+        }
+        button.setup-btn:hover { background: var(--accent); color: white; }
+    </style>
+</head>
+<body>
+
+    <h1 class="title">🌈 บันไดงูมหัศจรรย์ 🐍</h1>
+
+    <div id="setup" class="setup-screen">
+        <h2>เลือกจำนวนผู้เล่น (2 - 5 คน)</h2>
+        <div id="player-options">
+            <button class="setup-btn" onclick="startGame(2)">2 คน</button>
+            <button class="setup-btn" onclick="startGame(3)">3 คน</button>
+            <button class="setup-btn" onclick="startGame(4)">4 คน</button>
+            <button class="setup-btn" onclick="startGame(5)">5 คน</button>
+        </div>
+    </div>
+
+    <div id="game" class="game-container">
+        <canvas id="board" width="600" height="600"></canvas>
+        
+        <div class="side-panel">
+            <h3>ลำดับการเล่น</h3>
+            <div id="player-list"></div>
+            <hr>
+            <div class="dice-area">
+                <div id="dice-val" style="font-size: 50px; margin-bottom: 10px;">🎲</div>
+                <button id="dice-btn" onclick="rollDice()">ทอยลูกเต๋า!</button>
+                <p id="game-status" style="font-weight: bold; color: #57606f; margin-top: 15px;"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('board');
+        const ctx = canvas.getContext('2d');
+        const avatars = ['🐱', '🐶', '🐰', '🦊', '🦁'];
+        const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#1A535C', '#FF9F43'];
+        
+        let numPlayers = 2;
+        let players = [];
+        let currentPlayerIndex = 0;
+        const size = 10;
+        const cellSize = canvas.width / size;
+
+        const ladders = { 2: 23, 6: 45, 20: 59, 52: 72, 57: 96, 71: 92 };
+        const snakes = { 43: 17, 50: 5, 56: 8, 73: 15, 84: 58, 87: 49, 98: 40 };
+
+        function startGame(n) {
+            numPlayers = n;
+            players = [];
+            for(let i=0; i<n; i++) {
+                players.push({ id: i+1, pos: 1, avatar: avatars[i], color: colors[i] });
+            }
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('game').style.display = 'flex';
+            updatePlayerList();
+            drawBoard();
+        }
+
+        function updatePlayerList() {
+            const list = document.getElementById('player-list');
+            list.innerHTML = '';
+            players.forEach((p, i) => {
+                const div = document.createElement('div');
+                div.className = `player-card ${i === currentPlayerIndex ? 'active' : ''}`;
+                div.innerHTML = `<span style="font-size:24px; margin-right:10px">${p.avatar}</span> ผู้เล่นคนที่ ${p.id} (ช่อง ${p.pos})`;
+                list.appendChild(div);
+            });
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. วาดช่อง
+            for (let i = 0; i < 100; i++) {
+                let {x, y} = getCoords(i + 1);
+                ctx.fillStyle = (Math.floor(i/10) + i) % 2 === 0 ? '#ffffff' : '#f7f1e3';
+                ctx.fillRect(x - cellSize/2, y - cellSize/2, cellSize, cellSize);
+                ctx.strokeStyle = '#d1ccc0';
+                ctx.strokeRect(x - cellSize/2, y - cellSize/2, cellSize, cellSize);
+                
+                ctx.fillStyle = '#84817a';
+                ctx.font = '12px Kanit';
+                ctx.fillText(i + 1, x - cellSize/2 + 5, y - cellSize/2 + 15);
+            }
+
+            // 2. วาดบันได 🪜 (สีเขียว)
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            for (let start in ladders) {
+                drawPath(start, ladders[start], '#2ecc71', true);
+            }
+
+            // 3. วาดงู 🐍 (สีแดง)
+            for (let start in snakes) {
+                drawPath(start, snakes[start], '#ff4757', false);
+            }
+
+            // 4. วาดตัวผู้เล่น
+            players.forEach((p, i) => {
+                let {x, y} = getCoords(p.pos);
+                // เยื้องตำแหน่งเล็กน้อยไม่ให้ทับกันเป๊ะ
+                let offset = (i - (numPlayers-1)/2) * 12;
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = "rgba(0,0,0,0.3)";
+                ctx.fillText(p.avatar, x + offset, y);
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function getCoords(pos) {
+            let index = pos - 1;
+            let row = Math.floor(index / 10);
+            let col = index % 10;
+            let xPos = row % 2 === 0 ? col : (9 - col);
+            let yPos = 9 - row;
+            return { 
+                x: xPos * cellSize + cellSize / 2, 
+                y: yPos * cellSize + cellSize / 2 
+            };
+        }
+
+        function drawPath(start, end, color, isLadder) {
+            let s = getCoords(start);
+            let e = getCoords(end);
+            ctx.beginPath();
+            ctx.moveTo(s.x, s.y);
+            ctx.lineTo(e.x, e.y);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.6;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+
+            // หัวลูกศรบอกทิศทาง
+            ctx.fillStyle = color;
+            ctx.font = '20px Arial';
+            ctx.fillText(isLadder ? '🪜' : '🐍', (s.x + e.x)/2, (s.y + e.y)/2);
+        }
+
+        function rollDice() {
+            const btn = document.getElementById('dice-btn');
+            const status = document.getElementById('game-status');
+            btn.disabled = true;
+
+            const roll = Math.floor(Math.random() * 6) + 1;
+            document.getElementById('dice-val').innerText = ['🎲','⚀','⚁','⚂','⚃','⚄','⚅'][roll];
+            
+            let p = players[currentPlayerIndex];
+            let oldPos = p.pos;
+            p.pos += roll;
+
+            if (p.pos > 100) p.pos = oldPos; // ต้องลงล็อก 100 พอดี
+
+            let extraMsg = "";
+            if (ladders[p.pos]) {
+                p.pos = ladders[p.pos];
+                extraMsg = " โชคดีมาก! ขึ้นบันได 🪜";
+            } else if (snakes[p.pos]) {
+                p.pos = snakes[p.pos];
+                extraMsg = " แย่แล้ว! โดนงูกิน 🐍";
+            }
+
+            status.innerText = `ผู้เล่น ${p.avatar} ทอยได้ ${roll}!${extraMsg}`;
+            drawBoard();
+            updatePlayerList();
+
+            if (p.pos === 100) {
+                alert(`🎊 ยินดีด้วย! ผู้เล่น ${p.avatar} ชนะเกมนี้!`);
+                location.reload();
+                return;
+            }
+
+            setTimeout(() => {
+                currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
+                updatePlayerList();
+                btn.disabled = false;
+            }, 800);
+        }
+    </script>
+</body>
+</html>
