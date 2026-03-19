@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Bingo Kids 2026</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --yellow: #FFD32D; --red: #FF4757; --blue: #5463FF; --green: #2ED573; --purple: #8258E5;
+        }
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: radial-gradient(circle, #2f3542 0%, #000000 100%);
+            color: white; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden;
+        }
+
+        /* หน้าแรก */
+        .setup-screen {
+            text-align: center; margin-top: 50px; background: rgba(255,255,255,0.1); padding: 40px; border-radius: 30px; backdrop-filter: blur(10px); border: 2px solid var(--yellow);
+        }
+        h1 { font-size: 3.5rem; color: var(--yellow); text-shadow: 0 0 20px rgba(255,211,45,0.5); margin: 0; }
+        .btn-start {
+            background: var(--red); color: white; border: none; padding: 15px 40px; font-size: 1.5rem; border-radius: 50px; cursor: pointer; font-weight: 900; box-shadow: 0 10px 0 #b33939; transition: 0.2s; margin-top: 20px;
+        }
+        .btn-start:active { transform: translateY(5px); box-shadow: 0 5px 0 #b33939; }
+
+        /* ส่วนควบคุมหลัก */
+        #game-area { display: none; width: 95%; max-width: 1400px; padding: 20px; }
+        .main-controls {
+            display: flex; justify-content: space-around; align-items: center; background: rgba(255,255,255,0.15); padding: 20px; border-radius: 20px; margin-bottom: 30px; border-bottom: 5px solid var(--blue);
+        }
+        #current-number {
+            font-size: 5rem; width: 120px; height: 120px; background: var(--yellow); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 8px solid white; box-shadow: 0 0 30px var(--yellow);
+        }
+
+        /* ตารางบิงโกของผู้เล่น */
+        .players-container {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; width: 100%;
+        }
+        .bingo-card {
+            background: white; color: #333; padding: 15px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); position: relative;
+        }
+        .card-header { text-align: center; font-weight: 900; font-size: 1.2rem; margin-bottom: 10px; color: var(--purple); }
+        .grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px;
+        }
+        .cell {
+            aspect-ratio: 1/1; background: #f1f2f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem; cursor: pointer; transition: 0.3s; border: 2px solid transparent;
+        }
+        .cell.marked {
+            background: var(--green); color: white; transform: scale(0.9); box-shadow: inset 0 0 10px rgba(0,0,0,0.2); animation: pop 0.3s ease-out;
+        }
+        .cell.free { background: var(--red); color: white; }
+        
+        @keyframes pop { 0% {transform: scale(1.2);} 100% {transform: scale(0.9);} }
+
+        .winner-msg {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--yellow); color: black; padding: 50px; border-radius: 30px; font-size: 3rem; font-weight: 900; z-index: 1000; display: none; text-align: center; border: 10px solid white; box-shadow: 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        .history { font-size: 0.9rem; max-width: 400px; color: #ddd; }
+    </style>
+</head>
+<body>
+
+    <div id="setup" class="setup-screen">
+        <h1>BINGO! 🚀</h1>
+        <p>ระดับโลกสำหรับเด็ก ป.4</p>
+        <div style="margin: 20px;">
+            <label>จำนวนผู้เล่น: </label>
+            <select id="player-count" style="font-size: 1.2rem; padding: 5px 15px; border-radius: 10px;">
+                <option value="2">2 คน</option>
+                <option value="3">3 คน</option>
+                <option value="4">4 คน</option>
+                <option value="5">5 คน</option>
+            </select>
+        </div>
+        <button class="btn-start" onclick="initGame()">เริ่มความมันส์เลย!</button>
+    </div>
+
+    <div id="game-area">
+        <div class="main-controls">
+            <div>
+                <button class="btn-start" style="background:var(--blue); box-shadow: 0 8px 0 #2c349e;" onclick="drawNumber()">สุ่มเลข!</button>
+                <div class="history" id="history-text">เลขที่ออกแล้ว: -</div>
+            </div>
+            <div id="current-number">?</div>
+            <div style="text-align: right;">
+                <h3 style="color:var(--green); margin:0;">กติกาง่ายๆ</h3>
+                <p style="margin:0; font-size: 0.8rem;">กดเลขที่ออกให้เป็นสีเขียว<br>ใครเรียงครบ 5 ช่องก่อนชนะ!</p>
+            </div>
+        </div>
+
+        <div class="players-container" id="players-box"></div>
+    </div>
+
+    <div id="winner-popup" class="winner-msg">
+        <span id="winner-name"></span> ชนะแล้ว!!! 🏆
+        <br>
+        <button class="btn-start" onclick="location.reload()">เล่นใหม่</button>
+    </div>
+
+    <script>
+        let drawnNumbers = [];
+        let playerBoards = [];
+
+        function initGame() {
+            const count = document.getElementById('player-count').value;
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('game-area').style.display = 'block';
+            
+            const box = document.getElementById('players-box');
+            for(let i=1; i<=count; i++) {
+                const boardNumbers = generateBingoNumbers();
+                playerBoards.push(boardNumbers);
+                
+                const card = document.createElement('div');
+                card.className = 'bingo-card';
+                card.innerHTML = `<div class="card-header">ผู้เล่นคนที่ ${i}</div>`;
+                
+                const grid = document.createElement('div');
+                grid.className = 'grid';
+                
+                boardNumbers.forEach((num, index) => {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell' + (num === 'FREE' ? ' marked free' : '');
+                    cell.innerText = num;
+                    cell.onclick = () => {
+                        if(drawnNumbers.includes(num) || num === 'FREE') {
+                            cell.classList.toggle('marked');
+                            checkWinner(i, grid);
+                        }
+                    };
+                    grid.appendChild(cell);
+                });
+                
+                card.appendChild(grid);
+                box.appendChild(card);
+            }
+        }
+
+        function generateBingoNumbers() {
+            let nums = [];
+            while(nums.length < 25) {
+                let r = Math.floor(Math.random() * 75) + 1;
+                if(!nums.includes(r)) nums.push(r);
+            }
+            nums[12] = 'FREE'; // ช่องตรงกลาง
+            return nums;
+        }
+
+        function drawNumber() {
+            if(drawnNumbers.length >= 75) return;
+            let n;
+            do { n = Math.floor(Math.random() * 75) + 1; } while(drawnNumbers.includes(n));
+            
+            drawnNumbers.push(n);
+            document.getElementById('current-number').innerText = n;
+            document.getElementById('history-text').innerText = "เลขที่ออกแล้ว: " + drawnNumbers.join(', ');
+            
+            // Effect เสียงเบาๆ (ถ้ามี)
+            if('speechSynthesis' in window) {
+                let msg = new SpeechSynthesisUtterance(n);
+                msg.lang = 'th-TH';
+                window.speechSynthesis.speak(msg);
+            }
+        }
+
+        function checkWinner(playerIdx, gridElement) {
+            const cells = gridElement.querySelectorAll('.cell');
+            const marks = Array.from(cells).map(c => c.classList.contains('marked'));
+            
+            const winPatterns = [
+                // แนวนอน
+                [0,1,2,3,4], [5,6,7,8,9], [10,11,12,13,14], [15,16,17,18,19], [20,21,22,23,24],
+                // แนวตั้ง
+                [0,5,10,15,20], [1,6,11,16,21], [2,7,12,17,22], [3,8,13,18,23], [4,9,14,19,24],
+                // ทะแยง
+                [0,6,12,18,24], [4,8,12,16,20]
+            ];
+
+            for(let pattern of winPatterns) {
+                if(pattern.every(index => marks[index])) {
+                    document.getElementById('winner-name').innerText = "ผู้เล่นคนที่ " + playerIdx;
+                    document.getElementById('winner-popup').style.display = 'block';
+                    return;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
